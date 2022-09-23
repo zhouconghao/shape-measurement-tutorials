@@ -140,22 +140,26 @@ def cut_nones(presults, mresults):
 
 
 def _run_boostrap(x1, y1, x2, y2, wgts):
+
     rng = np.random.RandomState(seed=100)
     mvals = []
     cvals = []
+
     for _ in tqdm.trange(500, leave=False):
+
         ind = rng.choice(len(y1), replace=True, size=len(y1))
         _wgts = wgts[ind].copy()
         _wgts /= np.sum(_wgts)
+
         mvals.append(np.mean(y1[ind] * _wgts) / np.mean(x1[ind] * _wgts) - 1)
         cvals.append(np.mean(y2[ind] * _wgts) / np.mean(x2[ind] * _wgts))
 
-    return (
-        np.mean(y1 * wgts) / np.mean(x1 * wgts) - 1, np.std(mvals),
-        np.mean(y2 * wgts) / np.mean(x2 * wgts), np.std(cvals))
+    return (np.mean(y1 * wgts) / np.mean(x1 * wgts) - 1, np.std(mvals),
+            np.mean(y2 * wgts) / np.mean(x2 * wgts), np.std(cvals))
 
 
 def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
+
     n_per = x1.shape[0] // jackknife
     n = n_per * jackknife
     x1j = np.zeros(jackknife)
@@ -166,11 +170,11 @@ def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
 
     loc = 0
     for i in range(jackknife):
-        wgtsj[i] = np.sum(wgts[loc:loc+n_per])
-        x1j[i] = np.sum(x1[loc:loc+n_per] * wgts[loc:loc+n_per]) / wgtsj[i]
-        y1j[i] = np.sum(y1[loc:loc+n_per] * wgts[loc:loc+n_per]) / wgtsj[i]
-        x2j[i] = np.sum(x2[loc:loc+n_per] * wgts[loc:loc+n_per]) / wgtsj[i]
-        y2j[i] = np.sum(y2[loc:loc+n_per] * wgts[loc:loc+n_per]) / wgtsj[i]
+        wgtsj[i] = np.sum(wgts[loc:loc + n_per])
+        x1j[i] = np.sum(x1[loc:loc + n_per] * wgts[loc:loc + n_per]) / wgtsj[i]
+        y1j[i] = np.sum(y1[loc:loc + n_per] * wgts[loc:loc + n_per]) / wgtsj[i]
+        x2j[i] = np.sum(x2[loc:loc + n_per] * wgts[loc:loc + n_per]) / wgtsj[i]
+        y2j[i] = np.sum(y2[loc:loc + n_per] * wgts[loc:loc + n_per]) / wgtsj[i]
 
         loc += n_per
 
@@ -180,19 +184,16 @@ def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
     cvals = np.zeros(jackknife)
     for i in range(jackknife):
         _wgts = np.delete(wgtsj, i)
-        mvals[i] = (
-            np.sum(np.delete(y1j, i) * _wgts) / np.sum(np.delete(x1j, i) * _wgts)
-            - 1
-        )
-        cvals[i] = (
-            np.sum(np.delete(y2j, i) * _wgts) / np.sum(np.delete(x2j, i) * _wgts)
-        )
+        mvals[i] = (np.sum(np.delete(y1j, i) * _wgts) /
+                    np.sum(np.delete(x1j, i) * _wgts) - 1)
+        cvals[i] = (np.sum(np.delete(y2j, i) * _wgts) /
+                    np.sum(np.delete(x2j, i) * _wgts))
 
     return (
         mbar,
-        np.sqrt((n - n_per) / n * np.sum((mvals-mbar)**2)),
+        np.sqrt((n - n_per) / n * np.sum((mvals - mbar)**2)),
         cbar,
-        np.sqrt((n - n_per) / n * np.sum((cvals-cbar)**2)),
+        np.sqrt((n - n_per) / n * np.sum((cvals - cbar)**2)),
     )
 
 
@@ -245,6 +246,7 @@ def _estimate_m_and_c(
 
     prr_keep, mrr_keep = cut_nones(presults, mresults)
 
+    # calculate the response
     def _get_stuff(rr):
         _a = np.vstack(rr)
         g1p = _a[:, 0]
@@ -257,9 +259,8 @@ def _estimate_m_and_c(
         if swap12:
             g1p, g1m, g1, g2p, g2m, g2 = g2p, g2m, g2, g1p, g1m, g1
 
-        return (
-            g1, (g1p - g1m) / 2 / step * g_true,
-            g2, (g2p - g2m) / 2 / step)
+        return (g1, (g1p - g1m) / 2 / step * g_true, g2,
+                (g2p - g2m) / 2 / step)
 
     g1p, R11p, g2p, R22p = _get_stuff(prr_keep)
     g1m, R11m, g2m, R22m = _get_stuff(mrr_keep)
@@ -270,15 +271,9 @@ def _estimate_m_and_c(
         wgts = np.ones(len(g1p)).astype(np.float64)
     wgts /= np.sum(wgts)
 
-    msk = (
-        np.isfinite(g1p) &
-        np.isfinite(R11p) &
-        np.isfinite(g1m) &
-        np.isfinite(R11m) &
-        np.isfinite(g2p) &
-        np.isfinite(R22p) &
-        np.isfinite(g2m) &
-        np.isfinite(R22m))
+    msk = (np.isfinite(g1p) & np.isfinite(R11p) & np.isfinite(g1m)
+           & np.isfinite(R11m) & np.isfinite(g2p) & np.isfinite(R22p)
+           & np.isfinite(g2m) & np.isfinite(R22m))
     g1p = g1p[msk]
     R11p = R11p[msk]
     g1m = g1m[msk]
@@ -289,7 +284,7 @@ def _estimate_m_and_c(
     R22m = R22m[msk]
     wgts = wgts[msk]
 
-    x1 = (R11p + R11m)/2
+    x1 = (R11p + R11m) / 2
     y1 = (g1p - g1m) / 2
 
     x2 = (R22p + R22m) / 2
@@ -343,21 +338,23 @@ def estimate_m_and_c(
     cerr : float
         Estimate of the 1-sigma standard error in `c`.
     """
-    pres = [
-        (
-            pdata["g1p"][i], pdata["g1m"][i], pdata["g1"][i],
-            pdata["g2p"][i], pdata["g2m"][i], pdata["g2"][i],
-        )
-        for i in range(pdata.shape[0])
-    ]
+    pres = [(
+        pdata["g1p"][i],
+        pdata["g1m"][i],
+        pdata["g1"][i],
+        pdata["g2p"][i],
+        pdata["g2m"][i],
+        pdata["g2"][i],
+    ) for i in range(pdata.shape[0])]
 
-    mres = [
-        (
-            mdata["g1p"][i], mdata["g1m"][i], mdata["g1"][i],
-            mdata["g2p"][i], mdata["g2m"][i], mdata["g2"][i],
-        )
-        for i in range(pdata.shape[0])
-    ]
+    mres = [(
+        mdata["g1p"][i],
+        mdata["g1m"][i],
+        mdata["g1"][i],
+        mdata["g2p"][i],
+        mdata["g2m"][i],
+        mdata["g2"][i],
+    ) for i in range(pdata.shape[0])]
 
     return _estimate_m_and_c(
         pres,
@@ -370,7 +367,8 @@ def estimate_m_and_c(
     )
 
 
-def measure_shear_metadetect(res, *, s2n_cut, t_ratio_cut, ormask_cut, mfrac_cut):
+def measure_shear_metadetect(res, *, s2n_cut, t_ratio_cut, ormask_cut,
+                             mfrac_cut):
     """Measure the shear parameters for metadetect.
 
     NOTE: Returns None if nothing can be measured.
@@ -405,11 +403,14 @@ def measure_shear_metadetect(res, *, s2n_cut, t_ratio_cut, ormask_cut, mfrac_cut
         The mean 2-component shape for the zero-shear metadetect measurement.
     """
     def _mask(data):
-        _cut_msk = (
-            (data['flags'] == 0)
-            & (data['wmom_s2n'] > s2n_cut)
-            & (data['wmom_T_ratio'] > t_ratio_cut)
-        )
+        # print(data.dtype.names)
+        _cut_msk = ((data['wmom_flags'] == 0) & data['wmom_psf_flags'] == 0
+                    & data['wmom_obj_flags'] ==
+                    0 & data['wmom_band_flux_flags'] ==
+                    0 & data['wmom_T_flags'] == 0
+                    & data['psfrec_flags'] == 0
+                    & (data['wmom_s2n'] > s2n_cut)
+                    & (data['wmom_T_ratio'] > t_ratio_cut))
         if ormask_cut:
             _cut_msk = _cut_msk & (data['ormask'] == 0)
         if mfrac_cut is not None:
@@ -418,7 +419,7 @@ def measure_shear_metadetect(res, *, s2n_cut, t_ratio_cut, ormask_cut, mfrac_cut
 
     op = res['1p']
     q = _mask(op)
-    if not np.any(q):
+    if not np.any(q):  #
         return None
     g1p = op['wmom_g'][q, 0]
 
@@ -447,9 +448,8 @@ def measure_shear_metadetect(res, *, s2n_cut, t_ratio_cut, ormask_cut, mfrac_cut
         return None
     g2m = om['wmom_g'][q, 1]
 
-    return (
-        np.mean(g1p), np.mean(g1m), np.mean(g1),
-        np.mean(g2p), np.mean(g2m), np.mean(g2))
+    return (np.mean(g1p), np.mean(g1m), np.mean(g1), np.mean(g2p),
+            np.mean(g2m), np.mean(g2))
 
 
 def _run_mdet(obs, seed):
@@ -468,8 +468,8 @@ def _run_sim_pair(args):
     pobs = sim_func(g1=0.02, g2=0.0, seed=seed, **sim_kwargs)
     mobs = sim_func(g1=-0.02, g2=0.0, seed=seed, **sim_kwargs)
 
-    pres = _run_mdet(pobs, seed+1024768)
-    mres = _run_mdet(mobs, seed+1024769)
+    pres = _run_mdet(pobs, seed + 1024768)
+    mres = _run_mdet(mobs, seed + 1024769)
 
     if pres is None or mres is None:
         return None, None
@@ -480,12 +480,18 @@ def _run_sim_pair(args):
         dtype.append((key, "f8"))
 
     pgm = measure_shear_metadetect(
-        pres, s2n_cut=10, t_ratio_cut=1.2,
-        ormask_cut=False, mfrac_cut=None,
+        pres,
+        s2n_cut=10,
+        t_ratio_cut=1.2,
+        ormask_cut=False,
+        mfrac_cut=None,
     )
     mgm = measure_shear_metadetect(
-        mres, s2n_cut=10, t_ratio_cut=1.2,
-        ormask_cut=False, mfrac_cut=None,
+        mres,
+        s2n_cut=10,
+        t_ratio_cut=1.2,
+        ormask_cut=False,
+        mfrac_cut=None,
     )
     if pgm is None or mgm is None:
         return None, None
@@ -495,17 +501,25 @@ def _run_sim_pair(args):
 
     if backend == "mpi":
         print(
-            "[% 10ds] did %04d" % (time.time() - start, num+1),
+            "[% 10ds] did %04d" % (time.time() - start, num + 1),
             flush=True,
         )
 
     return np.array(datap, dtype=dtype), np.array(datam, dtype=dtype)
 
 
-def run_mdet_sims(
-    sim_func, sim_kwargs, seed, n_sims,
-    log_level='warning', backend='sequential', n_workers=None
-):
+#TODO:
+#1. Feed the result to measure shear metadetect (makes cuts, compute the average shape)
+#2.
+
+
+def run_mdet_sims(sim_func,
+                  sim_kwargs,
+                  seed,
+                  n_sims,
+                  log_level='warning',
+                  backend='sequential',
+                  n_workers=None):
     """Run simulation(s) and analyze them with metadetect.
 
     Parameters
@@ -589,20 +603,21 @@ def run_mdet_sims(
                 mdata,
             )
 
-            print("""\
+            print(
+                """\
     # of sims: {n_sims}
     noise cancel m   : {m: f} +/- {msd: f} [1e-3, 3-sigma]
     noise cancel c   : {c: f} +/- {csd: f} [1e-5, 3-sigma]""".format(
                     n_sims=len(pdata),
-                    m=m/1e-3,
-                    msd=msd/1e-3 * 3,
-                    c=c/1e-5,
-                    csd=csd/1e-5 * 3,
+                    m=m / 1e-3,
+                    msd=msd / 1e-3 * 3,
+                    c=c / 1e-5,
+                    csd=csd / 1e-5 * 3,
                 ),
                 flush=True,
             )
 
-            return pdata, mdata
+            return pdata, mdata, m / 1e-3, msd / 1e-3 * 3, c / 1e-5, csd / 1e-5 * 3
         else:
             return None, None
 
