@@ -154,14 +154,19 @@ def _run_boostrap(x1, y1, x2, y2, wgts):
         mvals.append(np.mean(y1[ind] * _wgts) / np.mean(x1[ind] * _wgts) - 1)
         cvals.append(np.mean(y2[ind] * _wgts) / np.mean(x2[ind] * _wgts))
 
+    #TODO: Why bootstrap ratio?
+
     return (np.mean(y1 * wgts) / np.mean(x1 * wgts) - 1, np.std(mvals),
             np.mean(y2 * wgts) / np.mean(x2 * wgts), np.std(cvals))
 
 
 def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
 
-    n_per = x1.shape[0] // jackknife
+    #jackknife is the jackknife size
+
+    n_per = x1.shape[0] // jackknife  #floor division
     n = n_per * jackknife
+
     x1j = np.zeros(jackknife)
     y1j = np.zeros(jackknife)
     x2j = np.zeros(jackknife)
@@ -170,7 +175,9 @@ def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
 
     loc = 0
     for i in range(jackknife):
+
         wgtsj[i] = np.sum(wgts[loc:loc + n_per])
+
         x1j[i] = np.sum(x1[loc:loc + n_per] * wgts[loc:loc + n_per]) / wgtsj[i]
         y1j[i] = np.sum(y1[loc:loc + n_per] * wgts[loc:loc + n_per]) / wgtsj[i]
         x2j[i] = np.sum(x2[loc:loc + n_per] * wgts[loc:loc + n_per]) / wgtsj[i]
@@ -180,8 +187,10 @@ def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
 
     mbar = np.mean(y1 * wgts) / np.mean(x1 * wgts) - 1
     cbar = np.mean(y2 * wgts) / np.mean(x2 * wgts)
+
     mvals = np.zeros(jackknife)
     cvals = np.zeros(jackknife)
+
     for i in range(jackknife):
         _wgts = np.delete(wgtsj, i)
         mvals[i] = (np.sum(np.delete(y1j, i) * _wgts) /
@@ -197,15 +206,15 @@ def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
     )
 
 
-def _estimate_m_and_c(
-    presults,
-    mresults,
-    g_true,
-    swap12=False,
-    step=0.01,
-    weights=None,
-    jackknife=None,
-):
+def _estimate_m_and_c(presults,
+                      mresults,
+                      g_true,
+                      swap12=False,
+                      step=0.01,
+                      weights=None,
+                      jackknife=None,
+                      use_p=True,
+                      use_m=True):
     """Estimate m and c from paired lensing simulations.
 
     Parameters
@@ -244,10 +253,11 @@ def _estimate_m_and_c(
         Estimate of the 1-sigma standard error in `c`.
     """
 
-    prr_keep, mrr_keep = cut_nones(presults, mresults)
+    prr_keep, mrr_keep = cut_nones(presults, mresults)  #remove None values
 
     # calculate the response
     def _get_stuff(rr):
+
         _a = np.vstack(rr)
         g1p = _a[:, 0]
         g1m = _a[:, 1]
@@ -256,24 +266,33 @@ def _estimate_m_and_c(
         g2m = _a[:, 4]
         g2 = _a[:, 5]
 
+        # pdata["g1p"][i],
+        # pdata["g1m"][i],
+        # pdata["g1"][i],
+        # pdata["g2p"][i],
+        # pdata["g2m"][i],
+        # pdata["g2"][i],
+
         if swap12:
             g1p, g1m, g1, g2p, g2m, g2 = g2p, g2m, g2, g1p, g1m, g1
 
-        return (g1, (g1p - g1m) / 2 / step * g_true, g2,
+        return (g1, g1p, g1m, (g1p - g1m) / 2 / step * g_true, g2, g2p, g2m,
                 (g2p - g2m) / 2 / step)
 
-    g1p, R11p, g2p, R22p = _get_stuff(prr_keep)
-    g1m, R11m, g2m, R22m = _get_stuff(mrr_keep)
+    g1p, g1pp, g1pm, R11p, g2p, g2pp, g2pm, R22p = _get_stuff(prr_keep)
+    g1m, g1mp, g1mm, R11m, g2m, g2mp, g2mm, R22m = _get_stuff(mrr_keep)
 
     if weights is not None:
         wgts = np.array(weights).astype(np.float64)
     else:
         wgts = np.ones(len(g1p)).astype(np.float64)
+
     wgts /= np.sum(wgts)
 
     msk = (np.isfinite(g1p) & np.isfinite(R11p) & np.isfinite(g1m)
            & np.isfinite(R11m) & np.isfinite(g2p) & np.isfinite(R22p)
            & np.isfinite(g2m) & np.isfinite(R22m))
+
     g1p = g1p[msk]
     R11p = R11p[msk]
     g1m = g1m[msk]
@@ -284,11 +303,30 @@ def _estimate_m_and_c(
     R22m = R22m[msk]
     wgts = wgts[msk]
 
-    x1 = (R11p + R11m) / 2
-    y1 = (g1p - g1m) / 2
+    if use_p and ~use_m:
+        x1 = R11p
+        y1 = g1p
 
-    x2 = (R22p + R22m) / 2
-    y2 = (g2p + g2m) / 2
+        x2 = R22p
+        y2 = g2p
+
+    elif use_m and ~use_p:
+        x1 = R11m
+        y1 = g1m
+
+        x2 = R22m
+        y2 = g2m
+
+    elif use_p and use_m:
+        x1 = (R11p + R11m) / 2
+        y1 = (g1p - g1m) / 2
+
+        # This is for g1, which is the sheared direction
+
+        x2 = (R22p + R22m) / 2
+        y2 = (g2p + g2m) / 2
+
+        #This is for g2, which is unsheared direction
 
     if jackknife:
         return _run_jackknife(x1, y1, x2, y2, wgts, jackknife)
@@ -296,15 +334,15 @@ def _estimate_m_and_c(
         return _run_boostrap(x1, y1, x2, y2, wgts)
 
 
-def estimate_m_and_c(
-    pdata,
-    mdata,
-    g_true=0.02,
-    swap12=False,
-    step=0.01,
-    weights=None,
-    jackknife=None,
-):
+def estimate_m_and_c(pdata,
+                     mdata,
+                     g_true=0.02,
+                     swap12=False,
+                     step=0.01,
+                     weights=None,
+                     jackknife=None,
+                     use_p=True,
+                     use_m=True):
     """Estimate m and c from paired lensing simulations.
 
     Parameters
@@ -356,15 +394,15 @@ def estimate_m_and_c(
         mdata["g2"][i],
     ) for i in range(pdata.shape[0])]
 
-    return _estimate_m_and_c(
-        pres,
-        mres,
-        g_true,
-        swap12=swap12,
-        step=step,
-        weights=weights,
-        jackknife=jackknife,
-    )
+    return _estimate_m_and_c(pres,
+                             mres,
+                             g_true,
+                             swap12=swap12,
+                             step=step,
+                             weights=weights,
+                             jackknife=jackknife,
+                             use_p=use_p,
+                             use_m=use_m)
 
 
 def measure_shear_metadetect(res, *, s2n_cut, t_ratio_cut, ormask_cut,
@@ -464,9 +502,13 @@ def _run_mdet(obs, seed):
 
 
 def _run_sim_pair(args):
+
     num, backend, sim_func, sim_kwargs, start, seed = args
+
     pobs = sim_func(g1=0.02, g2=0.0, seed=seed, **sim_kwargs)
     mobs = sim_func(g1=-0.02, g2=0.0, seed=seed, **sim_kwargs)
+
+    # The true shear is 0.02 0.0
 
     pres = _run_mdet(pobs, seed + 1024768)
     mres = _run_mdet(mobs, seed + 1024769)
@@ -510,7 +552,6 @@ def _run_sim_pair(args):
 
 #TODO:
 #1. Feed the result to measure shear metadetect (makes cuts, compute the average shape)
-#2.
 
 
 def run_mdet_sims(sim_func,
@@ -519,7 +560,9 @@ def run_mdet_sims(sim_func,
                   n_sims,
                   log_level='warning',
                   backend='sequential',
-                  n_workers=None):
+                  n_workers=None,
+                  use_p=True,
+                  use_m=True):
     """Run simulation(s) and analyze them with metadetect.
 
     Parameters
@@ -598,10 +641,10 @@ def run_mdet_sims(sim_func,
             pdata = combine_arrlist(list(pdata))
             mdata = combine_arrlist(list(mdata))
 
-            m, msd, c, csd = estimate_m_and_c(
-                pdata,
-                mdata,
-            )
+            m, msd, c, csd = estimate_m_and_c(pdata,
+                                              mdata,
+                                              use_p=use_p,
+                                              use_m=use_m)
 
             print(
                 """\
