@@ -271,6 +271,7 @@ def _estimate_m_and_c(
     msk = (np.isfinite(g1p) & np.isfinite(R11p) & np.isfinite(g1m)
            & np.isfinite(R11m) & np.isfinite(g2p) & np.isfinite(R22p)
            & np.isfinite(g2m) & np.isfinite(R22m))
+
     g1p = g1p[msk]
     R11p = R11p[msk]
     g1m = g1m[msk]
@@ -285,10 +286,11 @@ def _estimate_m_and_c(
     y1 = (g1p - g1m) / 2
 
     x2 = (R22p + R22m) / 2
-    y2 = (g2p + g2m) / 2
+    y2 = (g2p + g2m) / 2  #TODO: Why is this + and not -?
 
     if jackknife:
         return _run_jackknife(x1, y1, x2, y2, wgts, jackknife)
+        # return m and c
     else:
         return _run_boostrap(x1, y1, x2, y2, wgts)
 
@@ -461,7 +463,9 @@ def _run_mdet(obs, seed):
 
 
 def _run_sim_pair(args):
+
     num, backend, sim_func, sim_kwargs, start, seed = args
+
     pobs = sim_func(g1=0.02, g2=0.0, seed=seed, **sim_kwargs)
     mobs = sim_func(g1=-0.02, g2=0.0, seed=seed, **sim_kwargs)
 
