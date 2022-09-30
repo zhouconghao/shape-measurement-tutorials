@@ -334,9 +334,9 @@ def _estimate_m_and_c(presults,
         #This is for g2, which is unsheared direction
 
     if jackknife:
-        return _run_jackknife(x1, y1, x2, y2, wgts, jackknife)
+        return _run_jackknife(x1, y1, x2, y2, wgts, jackknife), x1
     else:
-        return _run_boostrap(x1, y1, x2, y2, wgts)
+        return _run_boostrap(x1, y1, x2, y2, wgts), x1
 
 
 def estimate_m_and_c(pdata,
@@ -555,10 +555,6 @@ def _run_sim_pair(args):
     return np.array(datap, dtype=dtype), np.array(datam, dtype=dtype)
 
 
-#TODO: Feed the result to measure shear metadetect (makes cuts, compute the average shape)
-#TODO: ask about the MPI shared memory
-
-
 def run_mdet_sims(sim_func,
                   sim_kwargs,
                   seed,
@@ -646,10 +642,13 @@ def run_mdet_sims(sim_func,
             pdata = combine_arrlist(list(pdata))
             mdata = combine_arrlist(list(mdata))
 
-            m, msd, c, csd = estimate_m_and_c(pdata,
-                                              mdata,
-                                              use_p=use_p,
-                                              use_m=use_m)
+            estimate_m_and_c_result = estimate_m_and_c(pdata,
+                                                       mdata,
+                                                       use_p=use_p,
+                                                       use_m=use_m)
+
+            m, msd, c, csd = estimate_m_and_c_result[0]
+            R11 = np.average(estimate_m_and_c_result[1])
 
             print(
                 """\
@@ -665,7 +664,7 @@ def run_mdet_sims(sim_func,
                 flush=True,
             )
 
-            return pdata, mdata, m / 1e-3, msd / 1e-3 * 3, c / 1e-5, csd / 1e-5 * 3
+            return pdata, mdata, m / 1e-3, msd / 1e-3 * 3, c / 1e-5, csd / 1e-5 * 3, R11
         else:
             return None, None
 
