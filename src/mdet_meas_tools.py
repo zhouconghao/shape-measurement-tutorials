@@ -303,21 +303,26 @@ def _estimate_m_and_c(presults,
     R22m = R22m[msk]
     wgts = wgts[msk]
 
-    if use_p and ~use_m:
+    #TODO: also ask about the mastercat
+
+    if (use_p and not use_m):  #TODO: why mixing and and ~ doesn't work?
+        print("Using only positive sheared observations")
         x1 = R11p
         y1 = g1p
 
         x2 = R22p
         y2 = g2p
 
-    elif use_m and ~use_p:
+    elif (use_m and not use_p):
+        print("Using only negative shear observations")
         x1 = R11m
         y1 = g1m
 
         x2 = R22m
         y2 = g2m
 
-    elif use_p and use_m:
+    elif (use_p and use_m):
+        print("Using both positive and negative shear")
         x1 = (R11p + R11m) / 2
         y1 = (g1p - g1m) / 2
 
@@ -550,8 +555,8 @@ def _run_sim_pair(args):
     return np.array(datap, dtype=dtype), np.array(datam, dtype=dtype)
 
 
-#TODO:
-#1. Feed the result to measure shear metadetect (makes cuts, compute the average shape)
+#TODO: Feed the result to measure shear metadetect (makes cuts, compute the average shape)
+#TODO: ask about the MPI shared memory
 
 
 def run_mdet_sims(sim_func,
