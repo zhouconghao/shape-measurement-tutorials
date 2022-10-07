@@ -154,8 +154,6 @@ def _run_boostrap(x1, y1, x2, y2, wgts):
         mvals.append(np.mean(y1[ind] * _wgts) / np.mean(x1[ind] * _wgts) - 1)
         cvals.append(np.mean(y2[ind] * _wgts) / np.mean(x2[ind] * _wgts))
 
-    #TODO: Why bootstrap ratio?
-
     return (np.mean(y1 * wgts) / np.mean(x1 * wgts) - 1, np.std(mvals),
             np.mean(y2 * wgts) / np.mean(x2 * wgts), np.std(cvals))
 
@@ -303,9 +301,7 @@ def _estimate_m_and_c(presults,
     R22m = R22m[msk]
     wgts = wgts[msk]
 
-    #TODO: also ask about the mastercat
-
-    if (use_p and not use_m):  #TODO: why mixing and and ~ doesn't work?
+    if (use_p and not use_m):
         print("Using only positive sheared observations")
         x1 = R11p
         y1 = g1p
@@ -334,9 +330,9 @@ def _estimate_m_and_c(presults,
         #This is for g2, which is unsheared direction
 
     if jackknife:
-        return _run_jackknife(x1, y1, x2, y2, wgts, jackknife), x1
+        return _run_jackknife(x1, y1, x2, y2, wgts, jackknife), x1 / g_true
     else:
-        return _run_boostrap(x1, y1, x2, y2, wgts), x1
+        return _run_boostrap(x1, y1, x2, y2, wgts), x1 / g_true
 
 
 def estimate_m_and_c(pdata,
@@ -447,18 +443,31 @@ def measure_shear_metadetect(res, *, s2n_cut, t_ratio_cut, ormask_cut,
     """
     def _mask(data):
         # print(data.dtype.names)
-        _cut_msk = ((data['wmom_flags'] == 0) & data['wmom_psf_flags'] == 0
-                    & data['wmom_obj_flags'] ==
-                    0 & data['wmom_band_flux_flags'] ==
-                    0 & data['wmom_T_flags'] == 0
-                    & data['psfrec_flags'] == 0
-                    & (data['wmom_s2n'] > s2n_cut)
-                    & (data['wmom_T_ratio'] > t_ratio_cut))
+        # mask & mask2 & mask3 & mask4 & mask5 # memory intensive
+        # & is bitwise and, need boolean array
+
+        _cut_msk = (data['wmom_flags'] == 0) & (data['wmom_psf_flags'] == 0)
+        _cut_msk &= (data['wmom_obj_flags'] == 0)
+        _cut_msk &= (data['wmom_band_flux_flags'] == 0)
+        _cut_msk &= (data['wmom_T_flags'] == 0)
+        _cut_msk &= (data['psfrec_flags'] == 0)
+        _cut_msk &= (data['wmom_s2n'] > s2n_cut)
+        _cut_msk &= (data['wmom_T_ratio'] > t_ratio_cut)
+
         if ormask_cut:
             _cut_msk = _cut_msk & (data['ormask'] == 0)
         if mfrac_cut is not None:
             _cut_msk = _cut_msk & (data["mfrac"] <= mfrac_cut)
         return _cut_msk
+
+        # _cut_msk = ((data['flags'] == 0)
+        #             & (data['wmom_s2n'] > s2n_cut)
+        #             & (data['wmom_T_ratio'] > t_ratio_cut))
+        # if ormask_cut:
+        #     _cut_msk = _cut_msk & (data['ormask'] == 0)
+        # if mfrac_cut is not None:
+        #     _cut_msk = _cut_msk & (data["mfrac"] <= mfrac_cut)
+        # return _cut_msk
 
     op = res['1p']
     q = _mask(op)
@@ -533,6 +542,7 @@ def _run_sim_pair(args):
         ormask_cut=False,
         mfrac_cut=None,
     )
+
     mgm = measure_shear_metadetect(
         mres,
         s2n_cut=10,
@@ -666,7 +676,7 @@ def run_mdet_sims(sim_func,
 
             return pdata, mdata, m / 1e-3, msd / 1e-3 * 3, c / 1e-5, csd / 1e-5 * 3, R11
         else:
-            return None, None
+            return None, None  # Do more simulation
 
 
 def write_sim_data(filename, pdata, mdata):
