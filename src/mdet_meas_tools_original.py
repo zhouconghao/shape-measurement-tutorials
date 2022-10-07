@@ -161,7 +161,7 @@ def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
     y1j = np.zeros(jackknife)
     x2j = np.zeros(jackknife)
     y2j = np.zeros(jackknife)
-    wgtsj = np.zeros(jackknife)  #weights for jackknife
+    wgtsj = np.zeros(jackknife)
 
     loc = 0
     for i in range(jackknife):
@@ -175,7 +175,6 @@ def _run_jackknife(x1, y1, x2, y2, wgts, jackknife):
 
     mbar = np.mean(y1 * wgts) / np.mean(x1 * wgts) - 1
     cbar = np.mean(y2 * wgts) / np.mean(x2 * wgts)
-    # on the 2 direction there is no shear so the mean is estimating 0.
     mvals = np.zeros(jackknife)
     cvals = np.zeros(jackknife)
     for i in range(jackknife):
@@ -260,8 +259,6 @@ def _estimate_m_and_c(
     g1p, R11p, g2p, R22p = _get_stuff(prr_keep)
     g1m, R11m, g2m, R22m = _get_stuff(mrr_keep)
 
-    # only g1p/ R11p without the cancelation trick on line 292
-
     if weights is not None:
         wgts = np.array(weights).astype(np.float64)
     else:
@@ -271,7 +268,6 @@ def _estimate_m_and_c(
     msk = (np.isfinite(g1p) & np.isfinite(R11p) & np.isfinite(g1m)
            & np.isfinite(R11m) & np.isfinite(g2p) & np.isfinite(R22p)
            & np.isfinite(g2m) & np.isfinite(R22m))
-
     g1p = g1p[msk]
     R11p = R11p[msk]
     g1m = g1m[msk]
@@ -286,11 +282,10 @@ def _estimate_m_and_c(
     y1 = (g1p - g1m) / 2
 
     x2 = (R22p + R22m) / 2
-    y2 = (g2p + g2m) / 2  #TODO: Why is this + and not -?
+    y2 = (g2p + g2m) / 2
 
     if jackknife:
         return _run_jackknife(x1, y1, x2, y2, wgts, jackknife)
-        # return m and c
     else:
         return _run_boostrap(x1, y1, x2, y2, wgts)
 
@@ -402,12 +397,7 @@ def measure_shear_metadetect(res, *, s2n_cut, t_ratio_cut, ormask_cut,
         The mean 2-component shape for the zero-shear metadetect measurement.
     """
     def _mask(data):
-        # print(data.dtype.names)
-        _cut_msk = ((data['wmom_flags'] == 0) & data['wmom_psf_flags'] == 0
-                    & data['wmom_obj_flags'] ==
-                    0 & data['wmom_band_flux_flags'] ==
-                    0 & data['wmom_T_flags'] == 0
-                    & data['psfrec_flags'] == 0
+        _cut_msk = ((data['flags'] == 0)
                     & (data['wmom_s2n'] > s2n_cut)
                     & (data['wmom_T_ratio'] > t_ratio_cut))
         if ormask_cut:
@@ -463,9 +453,7 @@ def _run_mdet(obs, seed):
 
 
 def _run_sim_pair(args):
-
     num, backend, sim_func, sim_kwargs, start, seed = args
-
     pobs = sim_func(g1=0.02, g2=0.0, seed=seed, **sim_kwargs)
     mobs = sim_func(g1=-0.02, g2=0.0, seed=seed, **sim_kwargs)
 
@@ -613,7 +601,7 @@ def run_mdet_sims(sim_func,
                 flush=True,
             )
 
-            return pdata, mdata, m / 1e-3, msd / 1e-3 * 3, c / 1e-5, csd / 1e-5 * 3
+            return pdata, mdata
         else:
             return None, None
 
